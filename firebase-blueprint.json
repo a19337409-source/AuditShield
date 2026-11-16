@@ -1,0 +1,425 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Auditor account profile stored per authenticated Google UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "enum": ["auditor", "admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "role", "createdAt", "updatedAt"]
+    },
+    "HotelWorkspace": {
+      "title": "HotelWorkspace",
+      "description": "Single-hotel operational settings, cash settlement, Kwentra snapshot, occupancy inputs, and lock state.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "hotelName": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "businessDate": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "currency": {
+          "type": "string",
+          "enum": ["EGP", "USD", "SAR", "EUR"]
+        },
+        "isOutageMode": {
+          "type": "boolean"
+        },
+        "dayLocked": {
+          "type": "boolean"
+        },
+        "config": {
+          "type": "object"
+        },
+        "settlement": {
+          "type": "object"
+        },
+        "kwentraSnapshot": {
+          "type": "object"
+        },
+        "occupancyInputs": {
+          "type": "object"
+        },
+        "cashDenominations": {
+          "type": "object"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "hotelName",
+        "businessDate",
+        "currency",
+        "isOutageMode",
+        "dayLocked",
+        "config",
+        "settlement",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "HotelRoomRecord": {
+      "title": "HotelRoomRecord",
+      "description": "Persistent hotel room inventory item with soft-archive flag preventing permanent deletion.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "workspaceId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "roomId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "roomNumber": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "floor": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "roomType": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "baseRate": {
+          "type": "number"
+        },
+        "maxOccupancy": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Occupied",
+            "VacantClean",
+            "VacantDirty",
+            "OutOfOrder",
+            "Complimentary",
+            "HouseUse"
+          ]
+        },
+        "guestName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "isArchived": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "workspaceId",
+        "roomId",
+        "roomNumber",
+        "floor",
+        "roomType",
+        "baseRate",
+        "maxOccupancy",
+        "status",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LedgerEntryRecord": {
+      "title": "LedgerEntryRecord",
+      "description": "Persistent outage/PMS/POS financial ledger record with soft-archive retention.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "workspaceId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "entryId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "timestamp": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "source": {
+          "type": "string",
+          "enum": ["PMS", "POS", "OutageBackup", "ManualEntry"]
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "Room",
+            "FoodBeverage",
+            "OtherRevenue",
+            "Rebate",
+            "PaidOut",
+            "Deposit",
+            "Payment",
+            "Adjustment"
+          ]
+        },
+        "outletOrDept": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "referenceNo": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "guestOrDescription": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "netAmount": {
+          "type": "number"
+        },
+        "serviceCharge": {
+          "type": "number"
+        },
+        "vatAmount": {
+          "type": "number"
+        },
+        "cityTaxAmount": {
+          "type": "number"
+        },
+        "grossAmount": {
+          "type": "number"
+        },
+        "taxInclusive": {
+          "type": "boolean"
+        },
+        "originalCurrency": {
+          "type": "string",
+          "enum": ["EGP", "USD", "SAR", "EUR"]
+        },
+        "originalNetAmount": {
+          "type": "number"
+        },
+        "fxRateApplied": {
+          "type": "number"
+        },
+        "mealPlan": {
+          "type": "string",
+          "enum": ["RO", "BB", "HB", "FB", "AI"]
+        },
+        "paxCount": {
+          "type": "number"
+        },
+        "packageSplitAmount": {
+          "type": "number"
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["Cash", "CreditCard", "CityLedger", "RoomCharge", "HouseUse"]
+        },
+        "cashierName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "approvedBy": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "reconciled": {
+          "type": "boolean"
+        },
+        "isArchived": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "workspaceId",
+        "entryId",
+        "timestamp",
+        "source",
+        "category",
+        "outletOrDept",
+        "referenceNo",
+        "guestOrDescription",
+        "netAmount",
+        "serviceCharge",
+        "vatAmount",
+        "grossAmount",
+        "paymentMethod",
+        "approvedBy",
+        "reconciled",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "OperationalRecord": {
+      "title": "OperationalRecord",
+      "description": "Typed audit sub-record (tasks, discrepancies, daily archives, EDC batches, cashier shifts, OTA, city ledger, banquets, audit trail, snapshots) stored permanently with soft-archive support.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "workspaceId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "recordId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "recordType": {
+          "type": "string",
+          "enum": [
+            "task",
+            "discrepancy",
+            "dailyArchive",
+            "edcTerminal",
+            "cashierShift",
+            "otaBooking",
+            "cityLedger",
+            "banquetEvent",
+            "auditTrail",
+            "backupSnapshot",
+            "roomReservation",
+            "roomFolioItem",
+            "posCatalogItem",
+            "exceptionResolution",
+            "nightAuditCheck"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 180
+        },
+        "payload": {
+          "type": "object"
+        },
+        "isArchived": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "ownerId",
+        "workspaceId",
+        "recordId",
+        "recordType",
+        "title",
+        "payload",
+        "isArchived",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserProfile"
+      },
+      "description": "Private auditor user profile document."
+    },
+    "/workspaces/{workspaceId}": {
+      "schema": {
+        "$ref": "#/entities/HotelWorkspace"
+      },
+      "description": "Single-hotel workspace configuration, settlement, and operational summary document."
+    },
+    "/workspaces/{workspaceId}/rooms/{roomId}": {
+      "schema": {
+        "$ref": "#/entities/HotelRoomRecord"
+      },
+      "description": "Persistent hotel room inventory records with non-destructive archive retention."
+    },
+    "/workspaces/{workspaceId}/ledgerEntries/{entryId}": {
+      "schema": {
+        "$ref": "#/entities/LedgerEntryRecord"
+      },
+      "description": "Persistent daily/outage financial ledger records with non-destructive archive retention."
+    },
+    "/workspaces/{workspaceId}/records/{recordId}": {
+      "schema": {
+        "$ref": "#/entities/OperationalRecord"
+      },
+      "description": "Persistent audit sub-records (archives, OTA, City Ledger, BEO, EDC, shifts, trail, snapshots)."
+    }
+  }
+}

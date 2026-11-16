@@ -1,0 +1,508 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Shared Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(ownerId) {
+      return isVerifiedUser() && request.auth.uid == ownerId;
+    }
+
+    function isWorkspaceOwner(workspaceId) {
+      return isVerifiedUser() &&
+        exists(/databases/$(database)/documents/workspaces/$(workspaceId)) &&
+        get(/databases/$(database)/documents/workspaces/$(workspaceId)).data.ownerId == request.auth.uid;
+    }
+
+    // Entity Validators
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['uid', 'displayName', 'role', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'displayName', 'role', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        data.uid == request.auth.uid &&
+        data.displayName is string &&
+        data.displayName.size() >= 1 &&
+        data.displayName.size() <= 120 &&
+        data.role == 'auditor' &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidWorkspaceConfig(cfg) {
+      return cfg is map &&
+        cfg.keys().size() <= 32 &&
+        cfg.propertyId is string &&
+        cfg.propertyId.size() >= 1 &&
+        cfg.propertyId.size() <= 80 &&
+        cfg.hotelName is string &&
+        cfg.hotelName.size() >= 1 &&
+        cfg.hotelName.size() <= 160 &&
+        cfg.businessDate is string &&
+        cfg.businessDate.size() >= 4 &&
+        cfg.businessDate.size() <= 20 &&
+        cfg.currency in ['EGP', 'USD', 'SAR', 'EUR'] &&
+        cfg.serviceChargePct is number &&
+        cfg.vatPct is number &&
+        cfg.cityTaxPct is number &&
+        cfg.minRoomRate is number &&
+        cfg.rebateApprovalLimit is number &&
+        cfg.cashVarianceTolerance is number &&
+        cfg.outlets is list &&
+        cfg.outlets.size() <= 40 &&
+        (cfg.outlets.size() == 0 || (cfg.outlets[0] is string && cfg.outlets[0].size() <= 80));
+    }
+
+    function isValidWorkspace(data) {
+      return data.keys().hasAll([
+          'ownerId',
+          'hotelName',
+          'businessDate',
+          'currency',
+          'isOutageMode',
+          'dayLocked',
+          'config',
+          'settlement',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'hotelName',
+          'businessDate',
+          'currency',
+          'isOutageMode',
+          'dayLocked',
+          'config',
+          'settlement',
+          'kwentraSnapshot',
+          'occupancyInputs',
+          'cashDenominations',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        data.hotelName is string &&
+        data.hotelName.size() >= 1 &&
+        data.hotelName.size() <= 160 &&
+        data.businessDate is string &&
+        data.businessDate.size() >= 4 &&
+        data.businessDate.size() <= 20 &&
+        data.currency in ['EGP', 'USD', 'SAR', 'EUR'] &&
+        data.isOutageMode is bool &&
+        data.dayLocked is bool &&
+        isValidWorkspaceConfig(data.config) &&
+        data.settlement is map &&
+        data.settlement.keys().size() <= 12 &&
+        (!('kwentraSnapshot' in data) || (data.kwentraSnapshot is map && data.kwentraSnapshot.keys().size() <= 20)) &&
+        (!('occupancyInputs' in data) || (data.occupancyInputs is map && data.occupancyInputs.keys().size() <= 10)) &&
+        (!('cashDenominations' in data) || (data.cashDenominations is map && data.cashDenominations.keys().size() <= 30)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidHotelRoom(data, workspaceId, roomId) {
+      return data.keys().hasAll([
+          'ownerId',
+          'workspaceId',
+          'roomId',
+          'roomNumber',
+          'floor',
+          'roomType',
+          'baseRate',
+          'maxOccupancy',
+          'status',
+          'isArchived',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'workspaceId',
+          'roomId',
+          'roomNumber',
+          'floor',
+          'roomType',
+          'baseRate',
+          'maxOccupancy',
+          'status',
+          'guestName',
+          'notes',
+          'isArchived',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isValidId(data.workspaceId) &&
+        data.workspaceId == workspaceId &&
+        isValidId(data.roomId) &&
+        data.roomId == roomId &&
+        data.roomNumber is string &&
+        data.roomNumber.size() >= 1 &&
+        data.roomNumber.size() <= 24 &&
+        data.floor is string &&
+        data.floor.size() >= 1 &&
+        data.floor.size() <= 24 &&
+        data.roomType is string &&
+        data.roomType.size() >= 1 &&
+        data.roomType.size() <= 80 &&
+        data.baseRate is number &&
+        data.baseRate >= 0 &&
+        data.maxOccupancy is number &&
+        data.maxOccupancy >= 1 &&
+        data.maxOccupancy <= 20 &&
+        data.status in [
+          'Occupied',
+          'VacantClean',
+          'VacantDirty',
+          'OutOfOrder',
+          'Complimentary',
+          'HouseUse'
+        ] &&
+        (!('guestName' in data) || (data.guestName is string && data.guestName.size() <= 120)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 300)) &&
+        data.isArchived is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidLedgerEntry(data, workspaceId, entryId) {
+      return data.keys().hasAll([
+          'ownerId',
+          'workspaceId',
+          'entryId',
+          'timestamp',
+          'source',
+          'category',
+          'outletOrDept',
+          'referenceNo',
+          'guestOrDescription',
+          'netAmount',
+          'serviceCharge',
+          'vatAmount',
+          'grossAmount',
+          'paymentMethod',
+          'approvedBy',
+          'reconciled',
+          'isArchived',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'workspaceId',
+          'entryId',
+          'timestamp',
+          'source',
+          'category',
+          'outletOrDept',
+          'referenceNo',
+          'guestOrDescription',
+          'netAmount',
+          'serviceCharge',
+          'vatAmount',
+          'cityTaxAmount',
+          'grossAmount',
+          'taxInclusive',
+          'originalCurrency',
+          'originalNetAmount',
+          'fxRateApplied',
+          'mealPlan',
+          'paxCount',
+          'packageSplitAmount',
+          'paymentMethod',
+          'cashierName',
+          'approvedBy',
+          'reconciled',
+          'isArchived',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isValidId(data.workspaceId) &&
+        data.workspaceId == workspaceId &&
+        isValidId(data.entryId) &&
+        data.entryId == entryId &&
+        data.timestamp is string &&
+        data.timestamp.size() >= 1 &&
+        data.timestamp.size() <= 32 &&
+        data.source in ['PMS', 'POS', 'OutageBackup', 'ManualEntry'] &&
+        data.category in [
+          'Room',
+          'FoodBeverage',
+          'OtherRevenue',
+          'Rebate',
+          'PaidOut',
+          'Deposit',
+          'Payment',
+          'Adjustment'
+        ] &&
+        data.outletOrDept is string &&
+        data.outletOrDept.size() >= 1 &&
+        data.outletOrDept.size() <= 100 &&
+        data.referenceNo is string &&
+        data.referenceNo.size() <= 80 &&
+        data.guestOrDescription is string &&
+        data.guestOrDescription.size() >= 1 &&
+        data.guestOrDescription.size() <= 240 &&
+        data.netAmount is number &&
+        data.serviceCharge is number &&
+        data.vatAmount is number &&
+        data.grossAmount is number &&
+        data.paymentMethod in ['Cash', 'CreditCard', 'CityLedger', 'RoomCharge', 'HouseUse'] &&
+        data.approvedBy is string &&
+        data.approvedBy.size() <= 120 &&
+        data.reconciled is bool &&
+        data.isArchived is bool &&
+        (!('cityTaxAmount' in data) || data.cityTaxAmount is number) &&
+        (!('taxInclusive' in data) || data.taxInclusive is bool) &&
+        (!('originalCurrency' in data) || data.originalCurrency in ['EGP', 'USD', 'SAR', 'EUR']) &&
+        (!('originalNetAmount' in data) || data.originalNetAmount is number) &&
+        (!('fxRateApplied' in data) || data.fxRateApplied is number) &&
+        (!('mealPlan' in data) || data.mealPlan in ['RO', 'BB', 'HB', 'FB', 'AI']) &&
+        (!('paxCount' in data) || data.paxCount is number) &&
+        (!('packageSplitAmount' in data) || data.packageSplitAmount is number) &&
+        (!('cashierName' in data) || (data.cashierName is string && data.cashierName.size() <= 120)) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidOperationalRecord(data, workspaceId, recordId) {
+      return data.keys().hasAll([
+          'ownerId',
+          'workspaceId',
+          'recordId',
+          'recordType',
+          'title',
+          'payload',
+          'isArchived',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId',
+          'workspaceId',
+          'recordId',
+          'recordType',
+          'title',
+          'payload',
+          'isArchived',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        isValidId(data.ownerId) &&
+        data.ownerId == request.auth.uid &&
+        isValidId(data.workspaceId) &&
+        data.workspaceId == workspaceId &&
+        isValidId(data.recordId) &&
+        data.recordId == recordId &&
+        data.recordType in [
+          'task',
+          'discrepancy',
+          'dailyArchive',
+          'edcTerminal',
+          'cashierShift',
+          'otaBooking',
+          'cityLedger',
+          'banquetEvent',
+          'auditTrail',
+          'backupSnapshot',
+          'roomReservation',
+          'roomFolioItem',
+          'posCatalogItem',
+          'exceptionResolution',
+          'nightAuditCheck'
+        ] &&
+        data.title is string &&
+        data.title.size() >= 1 &&
+        data.title.size() <= 180 &&
+        data.payload is map &&
+        data.payload.keys().size() <= 40 &&
+        data.isArchived is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Collection: /users/{userId}
+    match /users/{userId} {
+      allow get: if isValidId(userId) && isOwner(userId);
+      allow list: if false;
+      allow create: if isValidId(userId) &&
+        isOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(userId) &&
+        isOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().role == existing().role &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Collection: /workspaces/{workspaceId}
+    match /workspaces/{workspaceId} {
+      allow get: if isValidId(workspaceId) && isVerifiedUser() && existing().ownerId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+      allow create: if isValidId(workspaceId) &&
+        isVerifiedUser() &&
+        isValidWorkspace(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isValidId(workspaceId) &&
+        isVerifiedUser() &&
+        existing().ownerId == request.auth.uid &&
+        isValidWorkspace(incoming()) &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'hotelName',
+            'businessDate',
+            'currency',
+            'isOutageMode',
+            'dayLocked',
+            'config',
+            'settlement',
+            'kwentraSnapshot',
+            'occupancyInputs',
+            'cashDenominations',
+            'updatedAt'
+          ])
+        );
+      allow delete: if false;
+
+      // Subcollection: /workspaces/{workspaceId}/rooms/{roomId}
+      match /rooms/{roomId} {
+        allow get: if isValidId(workspaceId) && isValidId(roomId) && isWorkspaceOwner(workspaceId);
+        allow list: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(workspaceId) &&
+          isValidId(roomId) &&
+          isVerifiedUser() &&
+          isValidHotelRoom(incoming(), workspaceId, roomId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isWorkspaceOwner(workspaceId);
+        allow update: if isValidId(workspaceId) &&
+          isValidId(roomId) &&
+          isVerifiedUser() &&
+          isValidHotelRoom(incoming(), workspaceId, roomId) &&
+          isWorkspaceOwner(workspaceId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().workspaceId == existing().workspaceId &&
+          incoming().roomId == existing().roomId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            // Action: Edit room details
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'roomNumber',
+              'floor',
+              'roomType',
+              'baseRate',
+              'maxOccupancy',
+              'status',
+              'guestName',
+              'notes',
+              'updatedAt'
+            ]) ||
+            // Action: Soft-archive or restore room (zero permanent deletion)
+            incoming().diff(existing()).affectedKeys().hasOnly(['isArchived', 'updatedAt'])
+          );
+        allow delete: if false;
+      }
+
+      // Subcollection: /workspaces/{workspaceId}/ledgerEntries/{entryId}
+      match /ledgerEntries/{entryId} {
+        allow get: if isValidId(workspaceId) && isValidId(entryId) && isWorkspaceOwner(workspaceId);
+        allow list: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(workspaceId) &&
+          isValidId(entryId) &&
+          isVerifiedUser() &&
+          isValidLedgerEntry(incoming(), workspaceId, entryId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isWorkspaceOwner(workspaceId);
+        allow update: if isValidId(workspaceId) &&
+          isValidId(entryId) &&
+          isVerifiedUser() &&
+          isValidLedgerEntry(incoming(), workspaceId, entryId) &&
+          isWorkspaceOwner(workspaceId) &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().workspaceId == existing().workspaceId &&
+          incoming().entryId == existing().entryId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            // Action: Reconcile or approve ledger entry
+            incoming().diff(existing()).affectedKeys().hasOnly(['reconciled', 'approvedBy', 'updatedAt']) ||
+            // Action: Soft-archive or restore ledger entry
+            incoming().diff(existing()).affectedKeys().hasOnly(['isArchived', 'updatedAt'])
+          );
+        allow delete: if false;
+      }
+
+      // Subcollection: /workspaces/{workspaceId}/records/{recordId}
+      match /records/{recordId} {
+        allow get: if isValidId(workspaceId) && isValidId(recordId) && isWorkspaceOwner(workspaceId);
+        allow list: if isVerifiedUser() && existing().ownerId == request.auth.uid;
+        allow create: if isValidId(workspaceId) &&
+          isValidId(recordId) &&
+          isVerifiedUser() &&
+          isValidOperationalRecord(incoming(), workspaceId, recordId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time &&
+          isWorkspaceOwner(workspaceId);
+        allow update: if isValidId(workspaceId) &&
+          isValidId(recordId) &&
+          isVerifiedUser() &&
+          isValidOperationalRecord(incoming(), workspaceId, recordId) &&
+          isWorkspaceOwner(workspaceId) &&
+          existing().recordType != 'auditTrail' &&
+          incoming().ownerId == existing().ownerId &&
+          incoming().workspaceId == existing().workspaceId &&
+          incoming().recordId == existing().recordId &&
+          incoming().recordType == existing().recordType &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time &&
+          (
+            // Action: Update record payload/title
+            incoming().diff(existing()).affectedKeys().hasOnly(['title', 'payload', 'updatedAt']) ||
+            // Action: Soft-archive or restore record
+            incoming().diff(existing()).affectedKeys().hasOnly(['isArchived', 'updatedAt'])
+          );
+        allow delete: if false;
+      }
+    }
+  }
+}

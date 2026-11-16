@@ -1,0 +1,8 @@
+{
+  "name": "AuditShield — Hotel Income Auditor & PowerShell Contingency",
+  "description": "منصة مراجعة إيرادات الفنادق (Income Audit) وتشغيل بديل الطوارئ عبر PowerShell عند توقف سيستم الـ PMS/POS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
